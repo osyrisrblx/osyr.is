@@ -1,0 +1,30 @@
+---
+interface Props {
+  name: 'arrow' | 'reset' | 'pixel' | 'close' | 'heart';
+  class?: string;
+}
+const { name, class: className } = Astro.props;
+---
+
+<svg
+  class:list={['icon', className]}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2.25"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  {name === 'arrow' && <path d="M6 18 18 6M6 6h12v12" />}
+  {name === 'reset' && <path d="M4 10a8 8 0 1 1 1 8M4 4v6h6" />}
+  {name === 'close' && <path d="m6 6 12 12M6 18 18 6" />}
+  {name === 'heart' && <path d="m12 20-8-8C-2 5 7-1 12 6 17-1 26 5 20 12Z" />}
+  {name === 'pixel' && (
+    <path
+      stroke-width="3"
+      stroke-linecap="square"
+      d="M5 5h1m5 0h1m5 0h1M5 11h1m5 0h1m5 0h1M5 17h1m5 0h1m5 0h1"
+    />
+  )}
+</svg>
