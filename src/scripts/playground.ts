@@ -783,6 +783,25 @@ export async function initPlayground() {
     }
 
     canvas.addEventListener(
+      'touchmove',
+      (event) => {
+        // The canvas fills the hero: only a drag that grabbed the head owns
+        // the gesture. Cancel the first touchmove before native scrolling starts.
+        if (pointerId !== undefined && event.touches.length === 1)
+          event.preventDefault();
+      },
+      { ...eventOptions, passive: false },
+    );
+    document.addEventListener(
+      'touchstart',
+      (event) => {
+        // Give two-finger gestures back to the browser, even when the second
+        // finger lands outside the canvas. Lifting it must not resume the drag.
+        if (event.touches.length > 1) finishDrag();
+      },
+      { ...eventOptions, passive: true },
+    );
+    canvas.addEventListener(
       'pointerdown',
       (event) => {
         if (
@@ -861,16 +880,20 @@ export async function initPlayground() {
         !dragged &&
         event.timeStamp - pressTime <= 350 &&
         Math.hypot(event.clientX - pressX, event.clientY - pressY) <= 8;
+      const keepVelocity =
+        event.type === 'pointerup' &&
+        event.timeStamp - lastMoveTime <= 80 &&
+        !motionPreference.matches;
+      finishDrag(tapped, keepVelocity);
+    }
+    function finishDrag(tapped = false, keepVelocity = false) {
+      if (pointerId === undefined) return;
+      const releasedPointer = pointerId;
       pointerId = undefined;
       targetPitch = THREE.MathUtils.clamp(targetPitch, -pitchLimit, pitchLimit);
-      if (
-        event.type !== 'pointerup' ||
-        event.timeStamp - lastMoveTime > 80 ||
-        motionPreference.matches
-      )
-        velocity = 0;
-      if (canvas.hasPointerCapture(event.pointerId))
-        canvas.releasePointerCapture(event.pointerId);
+      if (!keepVelocity) velocity = 0;
+      if (canvas.hasPointerCapture(releasedPointer))
+        canvas.releasePointerCapture(releasedPointer);
       scheduleTracking();
       scheduleBlink();
       if (tapped) boop();
