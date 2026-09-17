@@ -8,6 +8,8 @@ async function openWithPreloadedFace(page: Page) {
     'data-state',
     'ready',
   );
+  // A slow software renderer must not turn the simulated quick spin into a slow one.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
 }
 
 async function spinHead(page: Page) {
@@ -69,6 +71,7 @@ test('reduced motion swaps the actual face and restores it without moving the he
   expect((await canvas.screenshot()).equals(dizzy)).toBe(true);
   await page.clock.fastForward(450);
   await expect(stage).toHaveAttribute('data-expression', 'normal');
+  await page.clock.runFor(32);
   expect((await canvas.screenshot()).equals(normal)).toBe(true);
 });
 
