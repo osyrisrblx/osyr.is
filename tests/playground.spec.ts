@@ -179,12 +179,15 @@ test('the head returns to mouse tracking after inactivity, but never during a he
   const initial = await canvas.screenshot();
   await page.mouse.down();
   await page.mouse.move(860, 550, { steps: 8 });
-  await page.clock.runFor(4500);
+  await page.clock.runFor(750);
+  // Skip idle frames while preserving the held-drag and inactivity deadlines.
+  await page.clock.fastForward(3750);
   const held = await canvas.screenshot();
   await page.mouse.up();
-  await page.clock.runFor(2000);
+  await page.clock.fastForward(2000);
   const waiting = await canvas.screenshot();
-  await page.clock.runFor(2500);
+  await page.clock.fastForward(1500);
+  await page.clock.runFor(1000);
   const returned = await canvas.screenshot();
   const difference = async (left: Buffer, right: Buffer) =>
     page.evaluate(
