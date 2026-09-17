@@ -6,12 +6,18 @@ export async function initPlayground() {
   const stage = document.querySelector<HTMLDivElement>('#head-stage')!;
   const canvas = document.querySelector<HTMLCanvasElement>('#head-canvas')!;
   const status = document.querySelector<HTMLParagraphElement>('#scene-status')!;
+  const sleepSymbols = document.querySelector<HTMLDivElement>('#head-sleep')!;
   const motionPreference = window.matchMedia(
     '(prefers-reduced-motion: reduce)',
   );
   let renderer: THREE.WebGLRenderer | undefined;
   let model: THREE.Group | undefined;
   let texture: THREE.Texture | undefined;
+  let dizzyTexture: THREE.Texture | undefined;
+  let blinkTexture: THREE.Texture | undefined;
+  let heartTexture: THREE.Texture | undefined;
+  let winkTexture: THREE.Texture | undefined;
+  let sleepTexture: THREE.Texture | undefined;
   let material: THREE.MeshToonMaterial | undefined;
   let outlineMaterial: THREE.ShaderMaterial | undefined;
   let gradient: THREE.DataTexture | undefined;
@@ -20,6 +26,11 @@ export async function initPlayground() {
   let observer: ResizeObserver | undefined;
   let trackingTimeout: ReturnType<typeof setTimeout> | undefined;
   let loadTimeout: ReturnType<typeof setTimeout> | undefined;
+  let shakeTimeout: ReturnType<typeof setTimeout> | undefined;
+  let recoveryTimeout: ReturnType<typeof setTimeout> | undefined;
+  let blinkTimeout: ReturnType<typeof setTimeout> | undefined;
+  let blinkEndTimeout: ReturnType<typeof setTimeout> | undefined;
+  let sleepTimeout: ReturnType<typeof setTimeout> | undefined;
   const events = new AbortController();
   const eventOptions = { signal: events.signal };
 
@@ -43,12 +54,23 @@ export async function initPlayground() {
     disposed = true;
     clearTimeout(loadTimeout);
     clearTimeout(trackingTimeout);
+    clearTimeout(shakeTimeout);
+    clearTimeout(recoveryTimeout);
+    clearTimeout(blinkTimeout);
+    clearTimeout(blinkEndTimeout);
+    clearTimeout(sleepTimeout);
+    sleepSymbols.hidden = true;
     cancelAnimationFrame(frame);
     observer?.disconnect();
     events.abort();
     if (model) disposeObject(model);
     gradient?.dispose();
     texture?.dispose();
+    dizzyTexture?.dispose();
+    blinkTexture?.dispose();
+    heartTexture?.dispose();
+    winkTexture?.dispose();
+    sleepTexture?.dispose();
     renderer?.dispose();
   }
 
@@ -167,15 +189,290 @@ export async function initPlayground() {
     let lastX = 0;
     let lastY = 0;
     let lastMoveTime = 0;
+    let pressX = 0;
+    let pressY = 0;
+    let pressTime = 0;
+    let dragged = false;
+    let dragPitch = pitch;
+    let pitchVelocity = 0;
+    let boopStartedAt: number | undefined;
     let tracking = true;
     let mouseX = 0.5;
     let mouseY = 0.5;
     let previousTime = 0;
     let isVisible = true;
     let ready = false;
+    let expression: 'normal' | 'dizzy' | 'shaking' | 'sleeping' = 'normal';
+    let sleepAmount = 0;
+    let spinDistance = 0;
+    let dizzyPending = false;
+    let lastSpinTime = 0;
+    let shakeStartedAt = 0;
+    let eyeGesture: 'blink' | 'wink' | undefined;
+    let idleBlinkCount = 0;
+    let hoveredLink: HTMLAnchorElement | undefined;
+    let focusedLink: HTMLAnchorElement | undefined;
+    const pitchLimit = 0.55;
+    const boopDuration = 600;
+    const spinThreshold = Math.PI * 4;
+    const shakeDuration = 800;
+    const sleepDelay = 60_000;
+    const sleepAnchor = new THREE.Vector3();
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let hoverPosition: { x: number; y: number } | undefined;
+
+    function loadFaceTexture(
+      path: string,
+      onLoad: (loaded: THREE.Texture) => void,
+    ) {
+      new THREE.TextureLoader()
+        .loadAsync(path)
+        .then((loaded) => {
+          if (disposed) {
+            loaded.dispose();
+            return;
+          }
+          loaded.colorSpace = THREE.SRGBColorSpace;
+          loaded.anisotropy = renderer!.capabilities.getMaxAnisotropy();
+          // Upload before the first expression change to avoid a first-use hitch.
+          renderer!.initTexture(loaded);
+          onLoad(loaded);
+        })
+        .catch(() => {
+          // Optional expressions must not interrupt the main head if they fail.
+        });
+    }
+
+    function activeLink() {
+      return hoveredLink ?? focusedLink;
+    }
+
+    function updateFace() {
+      sleepSymbols.hidden = expression !== 'sleeping';
+      if (expression === 'sleeping') {
+        material!.map = sleepTexture!;
+        stage.dataset.expression = 'sleeping';
+      } else if (expression === 'normal') {
+        const hearts =
+          pointerId === undefined &&
+          activeLink()?.classList.contains('support-link') &&
+          heartTexture;
+        if (eyeGesture === 'blink' && blinkTexture) {
+          material!.map = blinkTexture;
+          stage.dataset.expression = 'blink';
+        } else if (hearts) {
+          material!.map = hearts;
+          stage.dataset.expression = 'hearts';
+        } else if (eyeGesture === 'wink' && winkTexture) {
+          material!.map = winkTexture;
+          stage.dataset.expression = 'wink';
+        } else {
+          material!.map = texture!;
+          stage.dataset.expression = 'normal';
+        }
+      } else {
+        material!.map = dizzyTexture!;
+        stage.dataset.expression = expression;
+      }
+      requestRender();
+    }
+
+    function cancelBlink() {
+      clearTimeout(blinkTimeout);
+      clearTimeout(blinkEndTimeout);
+      if (eyeGesture) {
+        eyeGesture = undefined;
+        updateFace();
+      }
+    }
+
+    function closeEyes(gesture: 'blink' | 'wink', duration: number) {
+      eyeGesture = gesture;
+      updateFace();
+      blinkEndTimeout = setTimeout(() => {
+        eyeGesture = undefined;
+        updateFace();
+        scheduleBlink();
+      }, duration);
+    }
+
+    function cancelBoop() {
+      boopStartedAt = undefined;
+      head.scale.setScalar(1);
+      stage.dataset.gesture = 'none';
+    }
+
+    function boop() {
+      cancelBlink();
+      velocity = 0;
+      if (!motionPreference.matches) {
+        boopStartedAt = performance.now();
+        stage.dataset.gesture = 'boop';
+      }
+      closeEyes('blink', 140);
+      status.textContent = 'Boop!';
+      requestRender();
+    }
+
+    function scheduleBlink() {
+      clearTimeout(blinkTimeout);
+      if (
+        !blinkTexture ||
+        expression === 'sleeping' ||
+        motionPreference.matches ||
+        disposed ||
+        !isVisible ||
+        document.hidden
+      )
+        return;
+      blinkTimeout = setTimeout(
+        () => {
+          if (
+            expression !== 'normal' ||
+            pointerId !== undefined ||
+            !tracking ||
+            activeLink() ||
+            boopStartedAt !== undefined
+          ) {
+            scheduleBlink();
+            return;
+          }
+          idleBlinkCount++;
+          const wink = idleBlinkCount % 5 === 0 && winkTexture;
+          closeEyes(wink ? 'wink' : 'blink', wink ? 260 : 140);
+        },
+        6000 + Math.random() * 4000,
+      );
+    }
+
+    function setExpression(next: typeof expression) {
+      cancelBlink();
+      expression = next;
+      updateFace();
+    }
+
+    function wakeHead() {
+      if (expression !== 'sleeping') return;
+      setExpression('normal');
+      if (!motionPreference.matches) updateTrackingTarget();
+      scheduleBlink();
+      status.textContent = 'BiggerHead is awake.';
+    }
+
+    function scheduleSleep() {
+      clearTimeout(sleepTimeout);
+      if (disposed || motionPreference.matches || !isVisible || document.hidden)
+        return;
+      sleepTimeout = setTimeout(() => {
+        if (
+          !sleepTexture ||
+          pointerId !== undefined ||
+          expression !== 'normal' ||
+          !tracking ||
+          boopStartedAt !== undefined
+        ) {
+          scheduleSleep();
+          return;
+        }
+        velocity = 0;
+        pitchVelocity = 0;
+        normalizeYaw();
+        targetYaw = -0.22;
+        targetPitch = 0.35;
+        setExpression('sleeping');
+        status.textContent = 'BiggerHead is taking a nap.';
+      }, sleepDelay);
+    }
+
+    function recordActivity() {
+      wakeHead();
+      scheduleSleep();
+    }
+
+    function pauseSleep() {
+      clearTimeout(sleepTimeout);
+      wakeHead();
+    }
+
+    // Capture input before head/link handlers so waking never consumes the action.
+    for (const event of [
+      'pointermove',
+      'pointerdown',
+      'pointerup',
+      'keydown',
+      'wheel',
+      'scroll',
+      'focusin',
+    ]) {
+      document.addEventListener(event, recordActivity, {
+        ...eventOptions,
+        capture: true,
+        passive: true,
+      });
+    }
+
+    function recordSpin(angle: number) {
+      if (expression !== 'normal' || angle === 0) return;
+      const now = performance.now();
+      spinDistance = Math.max(0, spinDistance - (now - lastSpinTime) * 0.002);
+      spinDistance += Math.abs(angle);
+      lastSpinTime = now;
+      if (spinDistance >= spinThreshold) dizzyPending = true;
+    }
+
+    function becomeDizzy() {
+      if (expression !== 'normal') return;
+      clearTimeout(trackingTimeout);
+      tracking = false;
+      velocity = 0;
+      cancelBoop();
+      setExpression('dizzy');
+      status.textContent = 'Whoa, dizzy! Taking a moment to recover.';
+      recoverFromDizziness();
+    }
+
+    function finishDizziness(resumeTracking = true) {
+      clearTimeout(shakeTimeout);
+      clearTimeout(recoveryTimeout);
+      spinDistance = 0;
+      dizzyPending = false;
+      velocity = 0;
+      tracking = resumeTracking;
+      setExpression('normal');
+      if (resumeTracking) {
+        if (!motionPreference.matches) updateTrackingTarget();
+        scheduleBlink();
+      } else {
+        yaw = head.rotation.y;
+        pitch = head.rotation.x;
+        targetYaw = yaw;
+        targetPitch = pitch;
+      }
+      pitchVelocity = 0;
+      status.textContent = 'BiggerHead is feeling better.';
+    }
+
+    function recoverFromDizziness() {
+      clearTimeout(shakeTimeout);
+      clearTimeout(recoveryTimeout);
+      velocity = 0;
+      if (!motionPreference.matches) {
+        normalizeYaw();
+        updateTrackingTarget();
+      }
+      // Hold the spiral face before a short, diminishing left-right shake.
+      shakeTimeout = setTimeout(() => {
+        if (motionPreference.matches) {
+          finishDizziness();
+          return;
+        }
+        shakeStartedAt = performance.now();
+        setExpression('shaking');
+        recoveryTimeout = setTimeout(finishDizziness, shakeDuration);
+      }, 1200);
+      requestRender();
+    }
 
     function hitsHead(x: number, y: number) {
       const rect = canvas.getBoundingClientRect();
@@ -213,6 +510,7 @@ export async function initPlayground() {
         height,
       );
       camera.updateProjectionMatrix();
+      if (tracking && !motionPreference.matches) updateTrackingTarget();
       renderer!.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer!.setSize(width, height, false);
       requestRender();
@@ -231,30 +529,111 @@ export async function initPlayground() {
         : 1 / 60;
       previousTime = time;
       const reduceMotion = motionPreference.matches;
+      sleepAmount = reduceMotion
+        ? 0
+        : THREE.MathUtils.lerp(
+            sleepAmount,
+            expression === 'sleeping' ? 1 : 0,
+            1 - Math.exp(-2 * dt),
+          );
       if (pointerId === undefined && !reduceMotion) {
-        targetYaw += velocity * dt;
+        const spin = velocity * dt;
+        targetYaw += spin;
         velocity *= Math.exp(-4 * dt);
+        recordSpin(spin);
       }
-      const ease = reduceMotion ? 1 : 1 - Math.exp(-8 * dt);
+      const ease = reduceMotion
+        ? 1
+        : 1 - Math.exp(-(expression === 'sleeping' ? 2 : 8) * dt);
       yaw = THREE.MathUtils.lerp(yaw, targetYaw, ease);
-      pitch = THREE.MathUtils.lerp(pitch, targetPitch, ease);
-      head.rotation.set(pitch, yaw, 0);
-      head.position.y = reduceMotion ? 0 : Math.sin(time * 0.0006) * 0.015;
+      if (
+        reduceMotion ||
+        pointerId !== undefined ||
+        expression === 'sleeping'
+      ) {
+        pitch = THREE.MathUtils.lerp(pitch, targetPitch, ease);
+        pitchVelocity = 0;
+      } else {
+        // Small steps keep the spring stable even on a slow frame.
+        const steps = Math.ceil(dt / (1 / 120));
+        const step = dt / steps;
+        for (let i = 0; i < steps; i++) {
+          pitchVelocity +=
+            ((targetPitch - pitch) * 180 - pitchVelocity * 23) * step;
+          pitch += pitchVelocity * step;
+        }
+      }
+      const shakeProgress = THREE.MathUtils.clamp(
+        (time - shakeStartedAt) / shakeDuration,
+        0,
+        1,
+      );
+      const shake =
+        expression === 'shaking' && !reduceMotion
+          ? Math.sin(shakeProgress * Math.PI * 6) *
+            Math.sin(shakeProgress * Math.PI) *
+            0.18
+          : 0;
+      const dip =
+        expression === 'shaking' && !reduceMotion
+          ? Math.sin(shakeProgress * Math.PI) * 0.18
+          : 0;
+      head.rotation.set(pitch + dip, yaw + shake, -sleepAmount * 0.045);
+      head.position.y = reduceMotion
+        ? 0
+        : Math.sin(time * 0.0006) * 0.015 + sleepAmount * 0.05;
+      if (boopStartedAt !== undefined) {
+        const progress = (time - boopStartedAt) / boopDuration;
+        if (progress >= 1 || reduceMotion) {
+          cancelBoop();
+        } else {
+          const squish =
+            Math.sin(progress * Math.PI * 3) *
+            Math.exp(-progress * 5) *
+            (1 - progress) *
+            0.13;
+          head.scale.set(1 + squish * 0.4, 1 - squish, 1 + squish * 0.4);
+        }
+      }
       renderer!.render(scene, camera);
+      if (expression === 'sleeping') {
+        // Keep the little trail near the temple, clear of the intro on narrow screens.
+        sleepAnchor.set(-1.1, 0.95, 1);
+        head.localToWorld(sleepAnchor);
+        sleepAnchor.project(camera);
+        const { width, height } = stage.getBoundingClientRect();
+        const x = THREE.MathUtils.clamp(
+          ((sleepAnchor.x + 1) / 2) * width,
+          width * (width <= 600 ? 0.62 : 0.42),
+          width - (width <= 600 ? 90 : 120),
+        );
+        const y = THREE.MathUtils.clamp(
+          ((1 - sleepAnchor.y) / 2) * height,
+          width <= 600 ? 200 : 220,
+          height * 0.48,
+        );
+        sleepSymbols.style.transform = `translate(${x}px, ${y}px)`;
+      }
       updateCursor();
       if (!ready) {
         ready = true;
         stage.dataset.state = 'ready';
         status.textContent =
-          'BiggerHead is ready. Drag to spin, or focus the head and use the arrow keys.';
+          'BiggerHead is ready. Tap to boop, drag to spin, or use the arrow keys and Enter.';
       }
       if (!reduceMotion) requestRender();
     }
 
     const visibilityObserver = new IntersectionObserver(([entry]) => {
       isVisible = entry.isIntersecting;
-      if (isVisible) requestRender();
-      else {
+      if (isVisible) {
+        recordActivity();
+        requestRender();
+        scheduleBlink();
+      } else {
+        pauseSleep();
+        cancelBlink();
+        cancelBoop();
         cancelAnimationFrame(frame);
         frame = 0;
       }
@@ -271,11 +650,16 @@ export async function initPlayground() {
       'visibilitychange',
       () => {
         if (document.hidden) {
+          pauseSleep();
+          cancelBlink();
+          cancelBoop();
           cancelAnimationFrame(frame);
           frame = 0;
         } else {
+          recordActivity();
           previousTime = 0;
           requestRender();
+          scheduleBlink();
         }
       },
       eventOptions,
@@ -284,28 +668,115 @@ export async function initPlayground() {
       'change',
       () => {
         velocity = 0;
+        pitchVelocity = 0;
+        cancelBoop();
+        cancelBlink();
+        recordActivity();
+        if (tracking && !motionPreference.matches) updateTrackingTarget();
+        scheduleBlink();
         requestRender();
       },
       eventOptions,
     );
 
     function updateTrackingTarget() {
+      if (expression === 'sleeping') return;
+      const link = activeLink();
+      if (link) {
+        const rect = link.getBoundingClientRect();
+        const stageRect = stage.getBoundingClientRect();
+        const center = head.position.clone().project(camera);
+        const headX = stageRect.left + ((center.x + 1) / 2) * stageRect.width;
+        const headY = stageRect.top + ((1 - center.y) / 2) * stageRect.height;
+        targetYaw =
+          -0.22 +
+          THREE.MathUtils.clamp(
+            (rect.left + rect.width / 2 - headX) / stageRect.width,
+            -1,
+            1,
+          ) *
+            0.4;
+        targetPitch =
+          0.13 +
+          THREE.MathUtils.clamp(
+            (rect.top + rect.height / 2 - headY) / stageRect.height,
+            -1,
+            1,
+          ) *
+            0.3;
+        return;
+      }
       targetYaw = -0.22 + (mouseX - 0.5) * 0.18;
       targetPitch = 0.13 + (mouseY - 0.5) * 0.08;
+    }
+
+    function updateLinkReaction() {
+      cancelBlink();
+      updateFace();
+      if (tracking && !motionPreference.matches) updateTrackingTarget();
+      scheduleBlink();
+    }
+
+    for (const link of document.querySelectorAll<HTMLAnchorElement>(
+      'a[href^="https://"]',
+    )) {
+      link.addEventListener(
+        'pointerenter',
+        (event) => {
+          if (event.pointerType === 'touch') return;
+          hoveredLink = link;
+          updateLinkReaction();
+        },
+        eventOptions,
+      );
+      link.addEventListener(
+        'pointerleave',
+        () => {
+          if (hoveredLink === link) hoveredLink = undefined;
+          updateLinkReaction();
+        },
+        eventOptions,
+      );
+      link.addEventListener(
+        'focus',
+        () => {
+          focusedLink = link;
+          updateLinkReaction();
+        },
+        eventOptions,
+      );
+      link.addEventListener(
+        'blur',
+        () => {
+          if (focusedLink === link) focusedLink = undefined;
+          updateLinkReaction();
+        },
+        eventOptions,
+      );
+    }
+
+    function normalizeYaw() {
+      // Return by the shortest turn after any number of complete spins.
+      yaw =
+        -0.22 +
+        THREE.MathUtils.euclideanModulo(yaw + 0.22 + Math.PI, Math.PI * 2) -
+        Math.PI;
     }
 
     function scheduleTracking() {
       clearTimeout(trackingTimeout);
       trackingTimeout = setTimeout(() => {
-        if (pointerId !== undefined) return;
+        if (pointerId !== undefined || expression !== 'normal') return;
+        if (dizzyPending && dizzyTexture) {
+          becomeDizzy();
+          return;
+        }
+        dizzyPending = false;
+        spinDistance = 0;
         tracking = true;
         velocity = 0;
         if (motionPreference.matches) return;
-        // Avoid replaying complete rotations when returning from a long spin.
-        yaw =
-          -0.22 +
-          THREE.MathUtils.euclideanModulo(yaw + 0.22 + Math.PI, Math.PI * 2) -
-          Math.PI;
+        normalizeYaw();
         updateTrackingTarget();
         requestRender();
       }, 3000);
@@ -321,15 +792,25 @@ export async function initPlayground() {
         )
           return;
         clearTimeout(trackingTimeout);
+        cancelBoop();
+        cancelBlink();
+        if (expression !== 'normal') finishDizziness(false);
         pointerId = event.pointerId;
         canvas.setPointerCapture(event.pointerId);
         lastX = event.clientX;
         lastY = event.clientY;
         lastMoveTime = event.timeStamp;
+        pressX = event.clientX;
+        pressY = event.clientY;
+        pressTime = event.timeStamp;
+        dragged = false;
+        dragPitch = targetPitch;
+        pitchVelocity = 0;
         tracking = false;
         velocity = 0;
         updateCursor();
         canvas.focus({ preventScroll: true });
+        updateFace();
       },
       eventOptions,
     );
@@ -341,18 +822,23 @@ export async function initPlayground() {
           updateCursor();
         }
         if (event.pointerId !== pointerId) return;
+        if (Math.hypot(event.clientX - pressX, event.clientY - pressY) > 8)
+          dragged = true;
         const deltaX = event.clientX - lastX;
         targetYaw += deltaX * 0.009;
-        targetPitch = THREE.MathUtils.clamp(
-          targetPitch + (event.clientY - lastY) * 0.005,
-          -0.8,
-          0.8,
-        );
+        dragPitch += (event.clientY - lastY) * 0.005;
+        const excess = Math.max(0, Math.abs(dragPitch) - pitchLimit);
+        targetPitch = motionPreference.matches
+          ? THREE.MathUtils.clamp(dragPitch, -pitchLimit, pitchLimit)
+          : Math.sign(dragPitch) *
+            (Math.min(Math.abs(dragPitch), pitchLimit) +
+              0.2 * (1 - Math.exp(-excess / 0.3)));
         const elapsed = Math.max(
           (event.timeStamp - lastMoveTime) / 1000,
           1 / 120,
         );
         velocity = THREE.MathUtils.clamp((deltaX * 0.009) / elapsed, -8, 8);
+        recordSpin(deltaX * 0.009);
         lastX = event.clientX;
         lastY = event.clientY;
         lastMoveTime = event.timeStamp;
@@ -370,7 +856,13 @@ export async function initPlayground() {
     );
     function releasePointer(event: PointerEvent) {
       if (event.pointerId !== pointerId) return;
+      const tapped =
+        event.type === 'pointerup' &&
+        !dragged &&
+        event.timeStamp - pressTime <= 350 &&
+        Math.hypot(event.clientX - pressX, event.clientY - pressY) <= 8;
       pointerId = undefined;
+      targetPitch = THREE.MathUtils.clamp(targetPitch, -pitchLimit, pitchLimit);
       if (
         event.type !== 'pointerup' ||
         event.timeStamp - lastMoveTime > 80 ||
@@ -380,6 +872,8 @@ export async function initPlayground() {
       if (canvas.hasPointerCapture(event.pointerId))
         canvas.releasePointerCapture(event.pointerId);
       scheduleTracking();
+      scheduleBlink();
+      if (tapped) boop();
       updateCursor();
     }
     canvas.addEventListener('pointerup', releasePointer, eventOptions);
@@ -400,6 +894,14 @@ export async function initPlayground() {
     canvas.addEventListener(
       'keydown',
       (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (event.repeat || pointerId !== undefined) return;
+          if (expression !== 'normal') finishDizziness(false);
+          boop();
+          scheduleTracking();
+          return;
+        }
         if (
           !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(
             event.key,
@@ -407,21 +909,50 @@ export async function initPlayground() {
         )
           return;
         event.preventDefault();
+        cancelBoop();
+        cancelBlink();
+        if (expression !== 'normal') finishDizziness(false);
         tracking = false;
         velocity = 0;
         if (event.key === 'ArrowLeft') targetYaw -= 0.2;
         if (event.key === 'ArrowRight') targetYaw += 0.2;
         if (event.key === 'ArrowUp') targetPitch -= 0.15;
         if (event.key === 'ArrowDown') targetPitch += 0.15;
-        targetPitch = THREE.MathUtils.clamp(targetPitch, -0.8, 0.8);
-        scheduleTracking();
+        targetPitch = THREE.MathUtils.clamp(
+          targetPitch,
+          -pitchLimit,
+          pitchLimit,
+        );
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+          recordSpin(0.2);
+        if (expression === 'normal') scheduleTracking();
+        scheduleBlink();
         requestRender();
       },
       eventOptions,
     );
 
     canvas.hidden = false;
+    stage.dataset.expression = 'normal';
     resize();
+    scheduleSleep();
+    loadFaceTexture('/assets/biggerhead-texture-dizzy.webp', (loaded) => {
+      dizzyTexture = loaded;
+    });
+    loadFaceTexture('/assets/biggerhead-texture-blink.webp', (loaded) => {
+      blinkTexture = loaded;
+      scheduleBlink();
+    });
+    loadFaceTexture('/assets/biggerhead-texture-heart.webp', (loaded) => {
+      heartTexture = loaded;
+      updateFace();
+    });
+    loadFaceTexture('/assets/biggerhead-texture-wink.webp', (loaded) => {
+      winkTexture = loaded;
+    });
+    loadFaceTexture('/assets/biggerhead-texture-sleep.webp', (loaded) => {
+      sleepTexture = loaded;
+    });
   } catch (error) {
     console.warn('BiggerHead could not start:', error);
     stopRendering();

@@ -82,14 +82,25 @@ import ProjectLinks from '../components/ProjectLinks.astro';
               hidden
               tabindex="0"
               role="img"
-              aria-label="3D BiggerHead. Drag to spin, or use the arrow keys."
+              aria-label="3D BiggerHead. Tap to boop, drag to spin, or use the arrow keys and Enter."
               aria-describedby="head-help"
             ></canvas>
+            <div
+              id="head-sleep"
+              class="sleep-symbols"
+              hidden
+              aria-hidden="true"
+            >
+              <span>Z</span>
+              <span>Z</span>
+              <span>Z</span>
+            </div>
           </div>
         </div>
         <h1 id="hero-title">OSYRIS</h1>
         <p id="head-help" class="sr-only">
-          Drag to spin. Use the arrow keys to turn.
+          Tap to boop. Drag to spin. Use the arrow keys to turn, and Enter or
+          Space to boop.
         </p>
         <p id="scene-status" class="sr-only" role="status">
           The interactive head requires JavaScript.
