@@ -105,19 +105,12 @@ test('support hover and keyboard focus show heart eyes without moving under redu
   expect((await canvas.screenshot()).equals(initial)).toBe(true);
 });
 
-test('keyboard focus makes the head glance toward links, and dragging takes priority', async ({
+test('support keyboard focus shows heart eyes, and dragging takes priority', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await openWithFaces(page);
   const canvas = page.locator('#head-canvas');
-  const initial = await canvas.screenshot();
-  await page
-    .getByRole('navigation')
-    .getByRole('link', { name: 'GitHub' })
-    .focus();
-  await page.clock.runFor(800);
-  expect((await canvas.screenshot()).equals(initial)).toBe(false);
   await page.getByRole('link', { name: 'Sponsor on GitHub' }).focus();
   await expect(page.locator('#head-stage')).toHaveAttribute(
     'data-expression',

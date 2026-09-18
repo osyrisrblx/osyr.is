@@ -205,7 +205,6 @@ export async function initPlayground() {
     let expression: 'normal' | 'dizzy' | 'shaking' | 'sleeping' = 'normal';
     let sleepAmount = 0;
     let spinDistance = 0;
-    let dizzyPending = false;
     let lastSpinTime = 0;
     let shakeStartedAt = 0;
     let eyeGesture: 'blink' | 'wink' | undefined;
@@ -418,25 +417,22 @@ export async function initPlayground() {
       spinDistance = Math.max(0, spinDistance - (now - lastSpinTime) * 0.002);
       spinDistance += Math.abs(angle);
       lastSpinTime = now;
-      if (spinDistance >= spinThreshold) dizzyPending = true;
+      if (spinDistance >= spinThreshold && dizzyTexture) becomeDizzy();
     }
 
     function becomeDizzy() {
       if (expression !== 'normal') return;
-      clearTimeout(trackingTimeout);
-      tracking = false;
-      velocity = 0;
       cancelBoop();
       setExpression('dizzy');
-      status.textContent = 'Whoa, dizzy! Taking a moment to recover.';
-      recoverFromDizziness();
+      status.textContent = 'Whoa, dizzy!';
     }
 
     function finishDizziness(resumeTracking = true) {
       clearTimeout(shakeTimeout);
       clearTimeout(recoveryTimeout);
+      shakeTimeout = undefined;
+      recoveryTimeout = undefined;
       spinDistance = 0;
-      dizzyPending = false;
       velocity = 0;
       tracking = resumeTracking;
       setExpression('normal');
@@ -681,39 +677,13 @@ export async function initPlayground() {
 
     function updateTrackingTarget() {
       if (expression === 'sleeping') return;
-      const link = activeLink();
-      if (link) {
-        const rect = link.getBoundingClientRect();
-        const stageRect = stage.getBoundingClientRect();
-        const center = head.position.clone().project(camera);
-        const headX = stageRect.left + ((center.x + 1) / 2) * stageRect.width;
-        const headY = stageRect.top + ((1 - center.y) / 2) * stageRect.height;
-        targetYaw =
-          -0.22 +
-          THREE.MathUtils.clamp(
-            (rect.left + rect.width / 2 - headX) / stageRect.width,
-            -1,
-            1,
-          ) *
-            0.4;
-        targetPitch =
-          0.13 +
-          THREE.MathUtils.clamp(
-            (rect.top + rect.height / 2 - headY) / stageRect.height,
-            -1,
-            1,
-          ) *
-            0.3;
-        return;
-      }
-      targetYaw = -0.22 + (mouseX - 0.5) * 0.18;
-      targetPitch = 0.13 + (mouseY - 0.5) * 0.08;
+      targetYaw = -0.22 + (mouseX - 0.5) * 0.39;
+      targetPitch = 0.13 + (mouseY - 0.5) * 0.24;
     }
 
     function updateLinkReaction() {
       cancelBlink();
       updateFace();
-      if (tracking && !motionPreference.matches) updateTrackingTarget();
       scheduleBlink();
     }
 
@@ -766,12 +736,12 @@ export async function initPlayground() {
     function scheduleTracking() {
       clearTimeout(trackingTimeout);
       trackingTimeout = setTimeout(() => {
-        if (pointerId !== undefined || expression !== 'normal') return;
-        if (dizzyPending && dizzyTexture) {
-          becomeDizzy();
+        if (pointerId !== undefined) return;
+        if (expression === 'dizzy') {
+          recoverFromDizziness();
           return;
         }
-        dizzyPending = false;
+        if (expression !== 'normal') return;
         spinDistance = 0;
         tracking = true;
         velocity = 0;
@@ -813,7 +783,8 @@ export async function initPlayground() {
         clearTimeout(trackingTimeout);
         cancelBoop();
         cancelBlink();
-        if (expression !== 'normal') finishDizziness(false);
+        if (expression === 'shaking' || shakeTimeout !== undefined)
+          finishDizziness(false);
         pointerId = event.pointerId;
         canvas.setPointerCapture(event.pointerId);
         lastX = event.clientX;
@@ -934,7 +905,8 @@ export async function initPlayground() {
         event.preventDefault();
         cancelBoop();
         cancelBlink();
-        if (expression !== 'normal') finishDizziness(false);
+        if (expression === 'shaking' || shakeTimeout !== undefined)
+          finishDizziness(false);
         tracking = false;
         velocity = 0;
         if (event.key === 'ArrowLeft') targetYaw -= 0.2;
@@ -948,7 +920,7 @@ export async function initPlayground() {
         );
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
           recordSpin(0.2);
-        if (expression === 'normal') scheduleTracking();
+        scheduleTracking();
         scheduleBlink();
         requestRender();
       },

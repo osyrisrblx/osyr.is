@@ -22,11 +22,11 @@ async function spinHead(page: Page) {
   }
   await expect(page.locator('#head-stage')).toHaveAttribute(
     'data-expression',
-    'normal',
+    'dizzy',
   );
 }
 
-test('quick spins only cause dizziness after inactivity, then recover', async ({
+test('quick spins cause dizziness immediately and only recover after inactivity', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -36,10 +36,10 @@ test('quick spins only cause dizziness after inactivity, then recover', async ({
   await expect(stage).toHaveAttribute('data-state', 'ready');
   await spinHead(page);
   await page.clock.fastForward(4000);
-  await expect(stage).toHaveAttribute('data-expression', 'normal');
+  await expect(stage).toHaveAttribute('data-expression', 'dizzy');
   await page.mouse.up();
   await page.clock.fastForward(2800);
-  await expect(stage).toHaveAttribute('data-expression', 'normal');
+  await expect(stage).toHaveAttribute('data-expression', 'dizzy');
   await page.clock.fastForward(250);
   await expect(stage).toHaveAttribute('data-expression', 'dizzy');
   await page.clock.runFor(800);
@@ -62,10 +62,10 @@ test('reduced motion swaps the actual face and restores it without moving the he
   const normal = await canvas.screenshot();
   await spinHead(page);
   await page.mouse.up();
-  await page.clock.fastForward(3000);
   await page.clock.runFor(32);
   const dizzy = await canvas.screenshot();
   expect(dizzy.equals(normal)).toBe(false);
+  await page.clock.fastForward(3000);
   await page.clock.fastForward(800);
   await expect(stage).toHaveAttribute('data-expression', 'dizzy');
   expect((await canvas.screenshot()).equals(dizzy)).toBe(true);
@@ -73,6 +73,30 @@ test('reduced motion swaps the actual face and restores it without moving the he
   await expect(stage).toHaveAttribute('data-expression', 'normal');
   await page.clock.runFor(32);
   expect((await canvas.screenshot()).equals(normal)).toBe(true);
+});
+
+test('continued keyboard spins keep the dizzy face and delay recovery', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.clock.install();
+  await openWithPreloadedFace(page);
+  const stage = page.locator('#head-stage');
+  await page.locator('#head-canvas').focus();
+  for (let turn = 0; turn < 62; turn++) await page.keyboard.press('ArrowRight');
+  await expect(stage).toHaveAttribute('data-expression', 'normal');
+  await page.keyboard.press('ArrowRight');
+  await expect(stage).toHaveAttribute('data-expression', 'dizzy');
+  await page.clock.fastForward(2800);
+  await page.keyboard.press('ArrowRight');
+  await expect(stage).toHaveAttribute('data-expression', 'dizzy');
+  await page.clock.fastForward(2800);
+  await expect(stage).toHaveAttribute('data-expression', 'dizzy');
+  await page.clock.fastForward(200);
+  await page.clock.runFor(1200);
+  await expect(stage).toHaveAttribute('data-expression', 'shaking');
+  await page.clock.runFor(800);
+  await expect(stage).toHaveAttribute('data-expression', 'normal');
 });
 
 test('an unavailable optional texture keeps normal interaction working', async ({
