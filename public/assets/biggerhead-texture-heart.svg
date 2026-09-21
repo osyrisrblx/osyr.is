@@ -1,0 +1,20 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="320"
+  height="320"
+  viewBox="680 530 320 320"
+>
+  <path fill="red" d="M680 530h320v320H680z" />
+  <path
+    d="M723 644C761 613 815 581 846 581S930 610 968 638"
+    fill="none"
+    stroke="#000"
+    stroke-width="27"
+    stroke-linecap="round"
+  />
+  <path d="M783 710 754 739C730 763 758 795 783 765C808 795 836 763 812 739Z" />
+  <path
+    d="M783 710 754 739C730 763 758 795 783 765C808 795 836 763 812 739Z"
+    transform="translate(133 -3)"
+  />
+</svg>

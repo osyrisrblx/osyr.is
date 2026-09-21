@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function openWithPreloadedFace(page: Page) {
-  const faceLoaded = page.waitForResponse('**/biggerhead-texture-dizzy.webp');
+  const faceLoaded = page.waitForResponse('**/biggerhead-texture-dizzy.svg');
   await page.goto('/');
   await (await faceLoaded).finished();
   await expect(page.locator('#head-stage')).toHaveAttribute(
@@ -102,9 +102,7 @@ test('continued keyboard spins keep the dizzy face and delay recovery', async ({
 test('an unavailable optional texture keeps normal interaction working', async ({
   page,
 }) => {
-  await page.route('**/biggerhead-texture-dizzy.webp', (route) =>
-    route.abort(),
-  );
+  await page.route('**/biggerhead-texture-dizzy.svg', (route) => route.abort());
   await page.clock.install();
   await page.goto('/');
   const stage = page.locator('#head-stage');

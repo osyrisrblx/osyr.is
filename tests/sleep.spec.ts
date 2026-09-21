@@ -6,7 +6,7 @@ async function openHead(page: Page, reducedMotion = false) {
   });
   await page.clock.install();
   const loaded = ['blink', 'sleep'].map((face) =>
-    page.waitForResponse(`**/biggerhead-texture-${face}.webp`),
+    page.waitForResponse(`**/biggerhead-texture-${face}.svg`),
   );
   await page.goto('/');
   for (const response of loaded) await (await response).finished();
@@ -126,9 +126,7 @@ test('reduced motion suppresses sleep and enabling it wakes a sleeping head', as
 test('missing sleep texture or lost WebGL never leaves floating Zs', async ({
   page,
 }) => {
-  await page.route('**/biggerhead-texture-sleep.webp', (route) =>
-    route.abort(),
-  );
+  await page.route('**/biggerhead-texture-sleep.svg', (route) => route.abort());
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.clock.install();
   await page.goto('/');
@@ -137,7 +135,7 @@ test('missing sleep texture or lost WebGL never leaves floating Zs', async ({
   await page.clock.fastForward(120000);
   await expect(stage).not.toHaveAttribute('data-expression', 'sleeping');
   await expect(page.locator('#head-sleep span').first()).toBeHidden();
-  await page.unroute('**/biggerhead-texture-sleep.webp');
+  await page.unroute('**/biggerhead-texture-sleep.svg');
   await openHead(page);
   await page.clock.fastForward(60100);
   await expect(stage).toHaveAttribute('data-expression', 'sleeping');

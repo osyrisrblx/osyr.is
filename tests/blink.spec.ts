@@ -5,7 +5,7 @@ test('idle blinks briefly close the eyes, but dragging keeps them open', async (
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.clock.install();
-  const loaded = page.waitForResponse('**/biggerhead-texture-blink.webp');
+  const loaded = page.waitForResponse('**/biggerhead-texture-blink.svg');
   await page.goto('/');
   await (await loaded).finished();
   const stage = page.locator('#head-stage');
@@ -30,7 +30,7 @@ test('reduced motion suppresses blinking and cancels a blink immediately', async
   page,
 }) => {
   await page.clock.install();
-  const loaded = page.waitForResponse('**/biggerhead-texture-blink.webp');
+  const loaded = page.waitForResponse('**/biggerhead-texture-blink.svg');
   await page.goto('/');
   await (await loaded).finished();
   const stage = page.locator('#head-stage');

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function openWithFaces(page: Page) {
   const loaded = ['blink', 'heart', 'wink'].map((face) =>
-    page.waitForResponse(`**/biggerhead-texture-${face}.webp`),
+    page.waitForResponse(`**/biggerhead-texture-${face}.svg`),
   );
   await page.clock.install();
   await page.goto('/');
@@ -183,7 +183,7 @@ test('vertical overdrag rebounds on release before tracking resumes', async ({
 test('missing new expressions leave the head and links usable', async ({
   page,
 }) => {
-  await page.route('**/biggerhead-texture-{heart,wink}.webp', (route) =>
+  await page.route('**/biggerhead-texture-{heart,wink}.svg', (route) =>
     route.abort(),
   );
   await page.goto('/');
