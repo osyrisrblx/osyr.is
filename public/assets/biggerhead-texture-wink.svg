@@ -1,0 +1,23 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="320"
+  height="320"
+  viewBox="680 530 320 320"
+>
+  <path fill="red" d="M680 530h320v320H680z" />
+  <path
+    d="M723 644C761 613 815 581 846 581S930 610 968 638"
+    fill="none"
+    stroke="#000"
+    stroke-width="27"
+    stroke-linecap="round"
+  />
+  <circle cx="784" cy="754" r="23" />
+  <path
+    d="M886 755Q915 779 946 754"
+    fill="none"
+    stroke="#000"
+    stroke-width="16"
+    stroke-linecap="round"
+  />
+</svg>

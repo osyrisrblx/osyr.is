@@ -1,0 +1,16 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="320"
+  height="320"
+  viewBox="680 530 320 320"
+>
+  <path fill="red" d="M680 530h320v320H680z" />
+  <ellipse cx="849" cy="669" rx="19" ry="28.5" />
+  <path
+    d="M751 771Q782 791 814 771M891 770Q922 790 955 769"
+    fill="none"
+    stroke="#000"
+    stroke-width="14"
+    stroke-linecap="round"
+  />
+</svg>

@@ -1,0 +1,22 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="320"
+  height="320"
+  viewBox="680 530 320 320"
+>
+  <path fill="red" d="M680 530h320v320H680z" />
+  <path
+    d="M723 644C761 613 815 581 846 581S930 610 968 638"
+    fill="none"
+    stroke="#000"
+    stroke-width="27"
+    stroke-linecap="round"
+  />
+  <path
+    d="M753 752Q782 775 813 749M886 752Q915 775 946 749"
+    fill="none"
+    stroke="#000"
+    stroke-width="15"
+    stroke-linecap="round"
+  />
+</svg>

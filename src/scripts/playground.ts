@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { FaceTexture } from './face-texture';
 import { showHeadUnavailable } from './playground-status';
 
 export async function initPlayground() {
@@ -12,12 +13,13 @@ export async function initPlayground() {
   );
   let renderer: THREE.WebGLRenderer | undefined;
   let model: THREE.Group | undefined;
-  let texture: THREE.Texture | undefined;
-  let dizzyTexture: THREE.Texture | undefined;
-  let blinkTexture: THREE.Texture | undefined;
-  let heartTexture: THREE.Texture | undefined;
-  let winkTexture: THREE.Texture | undefined;
-  let sleepTexture: THREE.Texture | undefined;
+  let texture: FaceTexture | undefined;
+  let normalFace: HTMLImageElement | undefined;
+  let dizzyFace: HTMLImageElement | undefined;
+  let blinkFace: HTMLImageElement | undefined;
+  let heartFace: HTMLImageElement | undefined;
+  let winkFace: HTMLImageElement | undefined;
+  let sleepFace: HTMLImageElement | undefined;
   let material: THREE.MeshToonMaterial | undefined;
   let outlineMaterial: THREE.ShaderMaterial | undefined;
   let gradient: THREE.DataTexture | undefined;
@@ -66,11 +68,6 @@ export async function initPlayground() {
     if (model) disposeObject(model);
     gradient?.dispose();
     texture?.dispose();
-    dizzyTexture?.dispose();
-    blinkTexture?.dispose();
-    heartTexture?.dispose();
-    winkTexture?.dispose();
-    sleepTexture?.dispose();
     renderer?.dispose();
   }
 
@@ -121,19 +118,20 @@ export async function initPlayground() {
         if (disposed) disposeObject(loaded);
         else model = loaded;
       }),
-      new THREE.TextureLoader()
-        .loadAsync('/assets/biggerhead-texture-upscaled.webp')
+      new THREE.ImageLoader()
+        .loadAsync('/assets/biggerhead-texture-normal.svg')
         .then((loaded) => {
-          if (disposed) loaded.dispose();
-          else texture = loaded;
+          if (!disposed) normalFace = loaded;
         }),
     ]);
     clearTimeout(loadTimeout);
     if (disposed) return;
-    if (!model || !texture)
+    if (!model || !normalFace)
       throw new Error('Could not load the BiggerHead assets.');
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    texture = new FaceTexture(
+      normalFace,
+      renderer.capabilities.getMaxAnisotropy(),
+    );
     gradient = new THREE.DataTexture(
       new Uint8Array([75, 75, 75, 255, 165, 165, 165, 255, 255, 255, 255, 255]),
       3,
@@ -221,22 +219,14 @@ export async function initPlayground() {
     const pointer = new THREE.Vector2();
     let hoverPosition: { x: number; y: number } | undefined;
 
-    function loadFaceTexture(
+    function loadFace(
       path: string,
-      onLoad: (loaded: THREE.Texture) => void,
+      onLoad: (loaded: HTMLImageElement) => void,
     ) {
-      new THREE.TextureLoader()
+      new THREE.ImageLoader()
         .loadAsync(path)
         .then((loaded) => {
-          if (disposed) {
-            loaded.dispose();
-            return;
-          }
-          loaded.colorSpace = THREE.SRGBColorSpace;
-          loaded.anisotropy = renderer!.capabilities.getMaxAnisotropy();
-          // Upload before the first expression change to avoid a first-use hitch.
-          renderer!.initTexture(loaded);
-          onLoad(loaded);
+          if (!disposed) onLoad(loaded);
         })
         .catch(() => {
           // Optional expressions must not interrupt the main head if they fail.
@@ -250,28 +240,28 @@ export async function initPlayground() {
     function updateFace() {
       sleepSymbols.hidden = expression !== 'sleeping';
       if (expression === 'sleeping') {
-        material!.map = sleepTexture!;
+        texture!.setFace(sleepFace!);
         stage.dataset.expression = 'sleeping';
       } else if (expression === 'normal') {
         const hearts =
           pointerId === undefined &&
           activeLink()?.classList.contains('support-link') &&
-          heartTexture;
-        if (eyeGesture === 'blink' && blinkTexture) {
-          material!.map = blinkTexture;
+          heartFace;
+        if (eyeGesture === 'blink' && blinkFace) {
+          texture!.setFace(blinkFace);
           stage.dataset.expression = 'blink';
         } else if (hearts) {
-          material!.map = hearts;
+          texture!.setFace(hearts);
           stage.dataset.expression = 'hearts';
-        } else if (eyeGesture === 'wink' && winkTexture) {
-          material!.map = winkTexture;
+        } else if (eyeGesture === 'wink' && winkFace) {
+          texture!.setFace(winkFace);
           stage.dataset.expression = 'wink';
         } else {
-          material!.map = texture!;
+          texture!.setFace(normalFace!);
           stage.dataset.expression = 'normal';
         }
       } else {
-        material!.map = dizzyTexture!;
+        texture!.setFace(dizzyFace!);
         stage.dataset.expression = expression;
       }
       requestRender();
@@ -317,7 +307,7 @@ export async function initPlayground() {
     function scheduleBlink() {
       clearTimeout(blinkTimeout);
       if (
-        !blinkTexture ||
+        !blinkFace ||
         expression === 'sleeping' ||
         motionPreference.matches ||
         disposed ||
@@ -338,7 +328,7 @@ export async function initPlayground() {
             return;
           }
           idleBlinkCount++;
-          const wink = idleBlinkCount % 5 === 0 && winkTexture;
+          const wink = idleBlinkCount % 5 === 0 && winkFace;
           closeEyes(wink ? 'wink' : 'blink', wink ? 260 : 140);
         },
         6000 + Math.random() * 4000,
@@ -365,7 +355,7 @@ export async function initPlayground() {
         return;
       sleepTimeout = setTimeout(() => {
         if (
-          !sleepTexture ||
+          !sleepFace ||
           pointerId !== undefined ||
           expression !== 'normal' ||
           !tracking ||
@@ -417,7 +407,7 @@ export async function initPlayground() {
       spinDistance = Math.max(0, spinDistance - (now - lastSpinTime) * 0.002);
       spinDistance += Math.abs(angle);
       lastSpinTime = now;
-      if (spinDistance >= spinThreshold && dizzyTexture) becomeDizzy();
+      if (spinDistance >= spinThreshold && dizzyFace) becomeDizzy();
     }
 
     function becomeDizzy() {
@@ -509,6 +499,10 @@ export async function initPlayground() {
       if (tracking && !motionPreference.matches) updateTrackingTarget();
       renderer!.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer!.setSize(width, height, false);
+      texture!.resize(
+        height * renderer!.getPixelRatio(),
+        renderer!.capabilities.maxTextureSize,
+      );
       requestRender();
     }
 
@@ -642,6 +636,8 @@ export async function initPlayground() {
     );
     observer = new ResizeObserver(resize);
     observer.observe(stage);
+    // Moving between displays can change DPR without changing the stage size.
+    window.addEventListener('resize', resize, eventOptions);
     document.addEventListener(
       'visibilitychange',
       () => {
@@ -931,22 +927,22 @@ export async function initPlayground() {
     stage.dataset.expression = 'normal';
     resize();
     scheduleSleep();
-    loadFaceTexture('/assets/biggerhead-texture-dizzy.webp', (loaded) => {
-      dizzyTexture = loaded;
+    loadFace('/assets/biggerhead-texture-dizzy.svg', (loaded) => {
+      dizzyFace = loaded;
     });
-    loadFaceTexture('/assets/biggerhead-texture-blink.webp', (loaded) => {
-      blinkTexture = loaded;
+    loadFace('/assets/biggerhead-texture-blink.svg', (loaded) => {
+      blinkFace = loaded;
       scheduleBlink();
     });
-    loadFaceTexture('/assets/biggerhead-texture-heart.webp', (loaded) => {
-      heartTexture = loaded;
+    loadFace('/assets/biggerhead-texture-heart.svg', (loaded) => {
+      heartFace = loaded;
       updateFace();
     });
-    loadFaceTexture('/assets/biggerhead-texture-wink.webp', (loaded) => {
-      winkTexture = loaded;
+    loadFace('/assets/biggerhead-texture-wink.svg', (loaded) => {
+      winkFace = loaded;
     });
-    loadFaceTexture('/assets/biggerhead-texture-sleep.webp', (loaded) => {
-      sleepTexture = loaded;
+    loadFace('/assets/biggerhead-texture-sleep.svg', (loaded) => {
+      sleepFace = loaded;
     });
   } catch (error) {
     console.warn('BiggerHead could not start:', error);

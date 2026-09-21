@@ -46,12 +46,12 @@ test('a stalled texture times out and its late arrival does not revive the rende
   const pending = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route('**/biggerhead-texture-upscaled.webp', async (route) => {
+  await page.route('**/biggerhead-texture-normal.svg', async (route) => {
     await pending;
     await route.continue();
   });
   await page.clock.install();
-  const requested = page.waitForRequest('**/biggerhead-texture-upscaled.webp');
+  const requested = page.waitForRequest('**/biggerhead-texture-normal.svg');
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await requested;
   await expect(page.locator('#head-stage img')).toHaveCount(0);
@@ -61,7 +61,7 @@ test('a stalled texture times out and its late arrival does not revive the rende
     'data-state',
     'unavailable',
   );
-  const response = page.waitForResponse('**/biggerhead-texture-upscaled.webp');
+  const response = page.waitForResponse('**/biggerhead-texture-normal.svg');
   release();
   await (await response).finished();
   await page.clock.runFor(100);
