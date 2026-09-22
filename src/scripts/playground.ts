@@ -216,7 +216,9 @@ export async function initPlayground() {
 		let focusedLink: HTMLAnchorElement | undefined;
 		const pitchLimit = 0.55;
 		const boopDuration = 600;
-		const spinThreshold = Math.PI * 4;
+		const horizontalDragScale = 0.003;
+		const spinThreshold = Math.PI * 6;
+		const spinDecayPerMillisecond = 0.002;
 		const shakeDuration = 800;
 		const sleepDelay = 60_000;
 		const sleepAnchor = new THREE.Vector3();
@@ -416,7 +418,7 @@ export async function initPlayground() {
 			const now = performance.now();
 			spinDistance = Math.max(
 				0,
-				spinDistance - (now - lastSpinTime) * 0.002,
+				spinDistance - (now - lastSpinTime) * spinDecayPerMillisecond,
 			);
 			spinDistance += Math.abs(angle);
 			lastSpinTime = now;
@@ -837,7 +839,8 @@ export async function initPlayground() {
 				)
 					dragged = true;
 				const deltaX = event.clientX - lastX;
-				targetYaw += deltaX * 0.009;
+				const spin = deltaX * horizontalDragScale;
+				targetYaw += spin;
 				dragPitch += (event.clientY - lastY) * 0.005;
 				const excess = Math.max(0, Math.abs(dragPitch) - pitchLimit);
 				targetPitch = motionPreference.matches
@@ -849,12 +852,8 @@ export async function initPlayground() {
 					(event.timeStamp - lastMoveTime) / 1000,
 					1 / 120,
 				);
-				velocity = THREE.MathUtils.clamp(
-					(deltaX * 0.009) / elapsed,
-					-8,
-					8,
-				);
-				recordSpin(deltaX * 0.009);
+				velocity = THREE.MathUtils.clamp(spin / elapsed, -8, 8);
+				recordSpin(spin);
 				lastX = event.clientX;
 				lastY = event.clientY;
 				lastMoveTime = event.timeStamp;

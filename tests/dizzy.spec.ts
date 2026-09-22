@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Each 500px round trip adds 1.5 radians: 12 stay below three turns, 13 exceed it.
+const dragCyclesToDizziness = 13;
+
 async function openWithPreloadedFace(page: Page) {
 	const faceLoaded = page.waitForResponse('**/biggerhead-texture-dizzy.svg');
 	await page.goto('/');
@@ -16,9 +19,14 @@ async function spinHead(page: Page) {
 	await page.mouse.move(1100, 350);
 	await page.mouse.down();
 	// Return to the same pose so the screenshot isolates the face change.
-	for (let turn = 0; turn < 4; turn++) {
+	for (let turn = 0; turn < dragCyclesToDizziness; turn++) {
 		await page.mouse.move(1350, 350, { steps: 3 });
 		await page.mouse.move(1100, 350, { steps: 3 });
+		if (turn < dragCyclesToDizziness - 1)
+			await expect(page.locator('#head-stage')).toHaveAttribute(
+				'data-expression',
+				'normal',
+			);
 	}
 	await expect(page.locator('#head-stage')).toHaveAttribute(
 		'data-expression',
@@ -83,7 +91,7 @@ test('continued keyboard spins keep the dizzy face and delay recovery', async ({
 	await openWithPreloadedFace(page);
 	const stage = page.locator('#head-stage');
 	await page.locator('#head-canvas').focus();
-	for (let turn = 0; turn < 62; turn++)
+	for (let turn = 0; turn < 94; turn++)
 		await page.keyboard.press('ArrowRight');
 	await expect(stage).toHaveAttribute('data-expression', 'normal');
 	await page.keyboard.press('ArrowRight');
@@ -111,14 +119,38 @@ test('an unavailable optional texture keeps normal interaction working', async (
 	const stage = page.locator('#head-stage');
 	await expect(stage).toHaveAttribute('data-state', 'ready');
 	const canvas = page.locator('#head-canvas');
+	await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
 	await canvas.focus();
 	const before = await canvas.screenshot();
-	for (let turn = 0; turn < 80; turn++)
+	for (let turn = 0; turn < 120; turn++)
 		await page.keyboard.press('ArrowRight');
 	await page.clock.fastForward(3100);
 	await expect(stage).toHaveAttribute('data-expression', 'normal');
 	await expect(stage).toHaveAttribute('data-state', 'ready');
 	expect((await canvas.screenshot()).equals(before)).toBe(false);
+});
+
+test('steady dragging needs a faster burst to become dizzy', async ({
+	page,
+}) => {
+	await page.clock.install();
+	await openWithPreloadedFace(page);
+	const stage = page.locator('#head-stage');
+	await page.mouse.move(1100, 350);
+	await page.mouse.down();
+	// Keep holding the head so only spin decay, not the tracking reset, applies.
+	for (let turn = 0; turn < dragCyclesToDizziness; turn++) {
+		await page.mouse.move(1350, 350, { steps: 3 });
+		await page.mouse.move(1100, 350, { steps: 3 });
+		await expect(stage).toHaveAttribute('data-expression', 'normal');
+		await page.clock.runFor(500);
+	}
+	for (let turn = 0; turn < dragCyclesToDizziness; turn++) {
+		await page.mouse.move(1350, 350, { steps: 3 });
+		await page.mouse.move(1100, 350, { steps: 3 });
+	}
+	await expect(stage).toHaveAttribute('data-expression', 'dizzy');
+	await page.mouse.up();
 });
 
 test('slow turns do not accumulate into dizziness', async ({ page }) => {
