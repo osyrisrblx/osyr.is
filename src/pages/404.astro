@@ -9,17 +9,18 @@ import Icon from '../components/Icon.astro';
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="theme-color" content="#080808" />
+		<meta name="theme-color" content="#09090a" />
 		<meta name="robots" content="noindex" />
 		<link rel="icon" type="image/png" href="/assets/pixel-avatar.png" />
 		<title>Page not found</title>
 	</head>
 	<body>
 		<main class="not-found">
-			<span class="error-label">OSYR.IS / PAGE NOT FOUND</span>
+			<span class="eyebrow">osyr.is / page not found</span>
 			<h1>
 				404<span>.</span>
 			</h1>
+			<p>BiggerHead looked everywhere. This page isn’t here.</p>
 			<a href="/">
 				Back home <Icon name="arrow" />
 			</a>
@@ -29,37 +30,72 @@ import Icon from '../components/Icon.astro';
 
 <style>
 	.not-found {
+		position: relative;
+		isolation: isolate;
 		min-height: 100svh;
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
 		justify-content: center;
-		gap: 48px;
-		max-width: 1100px;
-		padding: 40px;
-		margin: auto;
+		gap: 28px;
+		padding: 40px max(40px, calc((100vw - 1100px) / 2));
+		background: radial-gradient(
+			ellipse 50% 60% at 80% 50%,
+			rgb(255 59 48 / 0.18),
+			transparent 70%
+		);
 	}
-	.error-label {
-		font:
-			12px 'Courier New',
-			monospace;
+	.not-found::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		background-image: radial-gradient(
+			circle,
+			rgb(243 239 230 / 0.16) 1px,
+			transparent 1.4px
+		);
+		background-size: 22px 22px;
+		mask-image: linear-gradient(100deg, #000 20%, transparent 70%);
 	}
 	.not-found h1 {
+		margin: 0;
 		font-size: clamp(120px, 28vw, 360px);
+		line-height: 0.8;
+		letter-spacing: -0.08em;
 	}
 	.not-found h1 span {
 		color: var(--red);
 	}
+	.not-found p {
+		margin: 0;
+		color: var(--muted);
+		font-size: 18px;
+	}
 	.not-found a {
-		padding: 20px 24px;
-		border: var(--line);
 		display: flex;
-		gap: 60px;
-		text-transform: uppercase;
-		font-size: 14px;
+		align-items: center;
+		gap: 40px;
+		margin-top: 12px;
+		padding: 14px 16px 14px 24px;
+		border: 1px solid rgb(243 239 230 / 0.2);
+		border-radius: 999px;
+		font-weight: 500;
+		transition:
+			background-color 0.2s,
+			color 0.2s;
+	}
+	.not-found a .icon {
+		width: 16px;
+		height: 16px;
 	}
 	.not-found a:hover {
-		color: var(--surface);
-		background: var(--text);
+		color: var(--ink);
+		background: var(--paper);
+	}
+	@media (max-width: 600px) {
+		.not-found {
+			padding: 20px;
+		}
 	}
 </style>

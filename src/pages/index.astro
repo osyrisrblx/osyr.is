@@ -10,7 +10,7 @@ import ProjectLinks from '../components/ProjectLinks.astro';
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="theme-color" content="#080808" />
+		<meta name="theme-color" content="#09090a" />
 		<meta
 			name="description"
 			content="Osyris. I make games & tools for making games."
@@ -43,7 +43,15 @@ import ProjectLinks from '../components/ProjectLinks.astro';
 			<section class="poster-hero" aria-labelledby="hero-title">
 				<header class="site-header">
 					<a class="brand" href="/" aria-label="Osyris home">
-						osyr.is
+						<img
+							src="/assets/pixel-avatar.png"
+							alt=""
+							width="28"
+							height="28"
+						/>
+						<span>
+							osyr<b>.</b>is
+						</span>
 					</a>
 					<nav aria-label="Main navigation">
 						<a
@@ -69,13 +77,15 @@ import ProjectLinks from '../components/ProjectLinks.astro';
 						</a>
 					</nav>
 				</header>
-				<p class="intro">
-					I make games
-					<br />
-					&amp; tools for
-					<br />
-					making games.
-				</p>
+				<div class="intro-block">
+					<p class="intro">
+						I make <em>games</em>
+						<br />
+						&amp; tools for
+						<br />
+						making games.
+					</p>
+				</div>
 				<div class="head-playground">
 					<div
 						id="head-stage"
@@ -102,7 +112,12 @@ import ProjectLinks from '../components/ProjectLinks.astro';
 						</div>
 					</div>
 				</div>
-				<h1 id="hero-title">OSYRIS</h1>
+				<h1 id="hero-title" class="wordmark wordmark-fill">
+					OSYRIS
+				</h1>
+				<p class="wordmark wordmark-outline" aria-hidden="true">
+					OSYRIS
+				</p>
 				<p id="head-help" class="sr-only">
 					Tap to boop. Drag to spin. Use the arrow keys to turn, and
 					Enter or Space to boop.
@@ -117,27 +132,30 @@ import ProjectLinks from '../components/ProjectLinks.astro';
 				aria-labelledby="projects-title"
 				tabindex="-1"
 			>
-				<h2 id="projects-title" class="sr-only">
-					Projects
+				<h2 id="projects-title" class="projects-title">
+					<span class="eyebrow">Projects</span>
+					<span>Tools I maintain</span>
 				</h2>
 				<ProjectLinks />
-				<a
-					class="more-projects"
-					href="https://github.com/osyrisrblx?tab=repositories"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					All repositories <Icon name="arrow" />
-				</a>
-				<a
-					class="support-link"
-					href="https://github.com/sponsors/osyrisrblx"
-					target="_blank"
-					rel="noopener noreferrer"
-					aria-label="Sponsor on GitHub"
-				>
-					<Icon name="heart" /> Support my work
-				</a>
+				<div class="projects-aside">
+					<a
+						class="more-projects"
+						href="https://github.com/osyrisrblx?tab=repositories"
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						All repositories <Icon name="arrow" />
+					</a>
+					<a
+						class="support-link"
+						href="https://github.com/sponsors/osyrisrblx"
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label="Sponsor on GitHub"
+					>
+						<Icon name="heart" /> Support my work
+					</a>
+				</div>
 			</section>
 		</main>
 		<script>

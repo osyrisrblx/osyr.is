@@ -173,6 +173,11 @@ test('the head fills the right edge and top corner across viewport sizes', async
 	]) {
 		await page.setViewportSize(viewport);
 		await page.goto('/');
+		// Flatten the decorative glow and grain so gaps show a known color.
+		await page.addStyleTag({
+			content:
+				'.poster-hero { background: #080808 !important; } .poster-hero::after { display: none; }',
+		});
 		await expect(page.locator('#head-stage')).toHaveAttribute(
 			'data-state',
 			'ready',
@@ -191,7 +196,7 @@ test('the head fills the right edge and top corner across viewport sizes', async
 				sample.height = image.height;
 				const context = sample.getContext('2d')!;
 				context.drawImage(image, 0, 0);
-				// The transparent canvas shows the page's #080808 background through gaps.
+				// The transparent canvas shows the flattened #080808 background through gaps.
 				return Array.from({ length: 21 }, (_, index) => {
 					const y = Math.round(2 + ((image.height - 5) * index) / 20);
 					const [r, g, b] = context.getImageData(
