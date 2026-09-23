@@ -217,6 +217,10 @@ test('the head fills the right edge and top corner across viewport sizes', async
 				`${viewport.width}px, ${key}: uncovered right edge`,
 			).toBe(0);
 		}
+		await expect(page.locator('.site-header nav')).toHaveCSS(
+			'background-color',
+			'rgba(0, 0, 0, 0)',
+		);
 	}
 });
 

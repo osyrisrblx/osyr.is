@@ -153,31 +153,22 @@ a {
 nav {
 	display: flex;
 	gap: 4px;
-	padding: 4px;
-	border: 1px solid rgb(243 239 230 / 0.14);
-	border-radius: 999px;
-	background: rgb(9 9 10 / 0.55);
-	backdrop-filter: blur(12px);
-	-webkit-backdrop-filter: blur(12px);
+	margin-right: -16px;
+	text-shadow:
+		0 1px 3px #000,
+		0 0 2px #000;
 }
 nav a {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	min-height: 40px;
+	min-height: 44px;
 	padding: 0 16px;
-	border-radius: 999px;
 	font-weight: 500;
-	transition:
-		background-color 0.2s,
-		color 0.2s;
 }
 nav a:hover {
-	background: var(--paper);
-	color: var(--ink);
-}
-nav a:hover img {
-	filter: none;
+	text-decoration: underline;
+	text-underline-offset: 4px;
 }
 nav a:focus-visible {
 	outline-color: var(--paper);
@@ -222,51 +213,6 @@ nav .icon {
 	font-style: normal;
 	color: var(--red);
 }
-.head-hint {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 8px 12px 8px 10px;
-	border: 1px solid rgb(243 239 230 / 0.14);
-	border-radius: 999px;
-	background: rgb(9 9 10 / 0.55);
-	color: var(--muted);
-	font: 500 11px/1 var(--mono);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	opacity: 0;
-	transform: translateY(6px);
-	transition:
-		opacity 0.6s 0.4s,
-		transform 0.6s 0.4s;
-}
-.head-hint::before {
-	content: '';
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	background: var(--red);
-	box-shadow: 0 0 0 0 rgb(255 59 48 / 0.6);
-	animation: hint-pulse 2.4s ease-out infinite;
-}
-.head-hint kbd {
-	padding: 2px 5px;
-	border: 1px solid rgb(243 239 230 / 0.2);
-	border-radius: 4px;
-	font: inherit;
-	color: var(--paper);
-}
-.poster-hero:has(#head-stage[data-state='ready']) .head-hint {
-	opacity: 1;
-	transform: none;
-}
-@keyframes hint-pulse {
-	70%,
-	100% {
-		box-shadow: 0 0 0 8px rgb(255 59 48 / 0);
-	}
-}
-
 .head-playground {
 	position: absolute;
 	inset: 0;
@@ -572,9 +518,11 @@ nav .icon {
 		width: 24px;
 		height: 24px;
 	}
+	nav {
+		margin-right: -12px;
+	}
 	nav a {
 		padding: 0 12px;
-		min-height: 36px;
 	}
 	nav .icon {
 		display: none;
@@ -588,9 +536,6 @@ nav .icon {
 	}
 	.intro em {
 		color: inherit;
-	}
-	.head-hint {
-		display: none;
 	}
 	.wordmark {
 		bottom: 30px;
@@ -664,8 +609,7 @@ nav .icon {
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.sleep-symbols span,
-	.head-hint::before {
+	.sleep-symbols span {
 		animation: none;
 	}
 	*,
