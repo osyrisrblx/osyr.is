@@ -233,7 +233,6 @@ nav .icon {
 	cursor: default;
 	opacity: 0;
 	touch-action: pan-y pinch-zoom;
-	transition: opacity 0.5s;
 }
 .head-stage[data-state='ready'] canvas {
 	opacity: 1;
